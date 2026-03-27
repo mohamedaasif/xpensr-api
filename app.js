@@ -4,6 +4,12 @@ require("dotenv").config();
 
 const app = express();
 
+app.use(express.json());
+
+const authRouter = require("./src/routes/auth");
+
+app.use("/", authRouter);
+
 connectDB()
   .then(() => {
     console.log("Database connection established...");
