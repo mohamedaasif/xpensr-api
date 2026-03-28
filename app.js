@@ -1,14 +1,18 @@
 const express = require("express");
 const { connectDB } = require("./src/config/database");
+const cookieParser = require("cookie-parser");
 require("dotenv").config();
 
 const app = express();
 
 app.use(express.json());
+app.use(cookieParser());
 
 const authRouter = require("./src/routes/auth");
+const profileRouter = require("./src/routes/profile");
 
 app.use("/", authRouter);
+app.use("/", profileRouter);
 
 connectDB()
   .then(() => {
