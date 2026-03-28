@@ -18,7 +18,7 @@ async function signup(req, res) {
     });
 
     const savedUser = await user.save();
-    const token = savedUser.getJWT();
+    const token = await savedUser.getJWT();
 
     res.cookie("token", token, {
       expires: new Date(Date.now() + 24 * 3600000), // 24h | 1d
@@ -26,8 +26,50 @@ async function signup(req, res) {
 
     res.json({ message: "User Added successfully!", data: savedUser });
   } catch (err) {
-    res.status(400).send("Error: " + err.message);
+    res.status(400).send("ERROR: " + err.message);
   }
 }
 
-module.exports = { signup };
+async function login(req, res) {
+  try {
+    const { emailId, password } = req.body;
+    const user = await User.findOne({ emailId: emailId });
+
+    if (!user) {
+      throw new Error("Invalid credentials");
+    }
+
+    const isPasswordValid = await user.validatePassword(password);
+    if (isPasswordValid) {
+      const token = await user.getJWT();
+
+      res.cookie("token", token, {
+        expires: new Date(Date.now() + 24 * 3600000),
+      });
+
+      const { _id, firstName, lastName, emailId, createdAt, updatedAt } = user;
+
+      res.send({
+        _id,
+        firstName,
+        lastName,
+        emailId,
+        createdAt,
+        updatedAt,
+      });
+    } else {
+      throw new Error("Invalid credentials");
+    }
+  } catch (err) {
+    res.status(400).send("ERROR: " + err.message);
+  }
+}
+
+async function logout(req, res) {
+  res.cookie("token", null, {
+    expires: new Date(Date.now()),
+  });
+  res.send("Logout successful");
+}
+
+module.exports = { signup, login, logout };
