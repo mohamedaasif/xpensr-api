@@ -48,20 +48,22 @@ async function login(req, res) {
       });
 
       const { _id, firstName, lastName, emailId, createdAt, updatedAt } = user;
-
-      res.send({
-        _id,
-        firstName,
-        lastName,
-        emailId,
-        createdAt,
-        updatedAt,
+      res.status(200).json({
+        success: true,
+        data: {
+          _id,
+          firstName,
+          lastName,
+          emailId,
+          createdAt,
+          updatedAt,
+        },
       });
     } else {
       throw new Error("Invalid credentials");
     }
   } catch (err) {
-    res.status(400).send("ERROR: " + err.message);
+    res.status(400).json({ success: false, message: err.message });
   }
 }
 
