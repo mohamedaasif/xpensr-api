@@ -24,9 +24,15 @@ async function signup(req, res) {
       expires: new Date(Date.now() + 24 * 3600000), // 24h | 1d
     });
 
-    res.json({ message: "User Added successfully!", data: savedUser });
+    res
+      .status(200)
+      .json({
+        success: true,
+        message: "User Added successfully!",
+        data: savedUser,
+      });
   } catch (err) {
-    res.status(400).send("ERROR: " + err.message);
+    res.status(400).json({ success: false, message: err.message });
   }
 }
 
