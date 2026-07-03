@@ -1,4 +1,4 @@
-const Account = require("../models/account");
+const prisma = require("../config/prisma");
 
 async function postAccountDetails(req, res) {
   try {
@@ -12,25 +12,32 @@ async function postAccountDetails(req, res) {
       isArchived,
     } = req.body;
 
-    const account = new Account({
-      userId: req.user.id,
-      name,
-      type,
-      bankName,
-      openingBalance,
-      balance: openingBalance,
-      currency,
-      isDefault,
-      isArchived,
+    const accountDetails = await prisma.account.create({
+      data: {
+        userId: req.user.id,
+        name,
+        type,
+        bankName,
+        openingBalance,
+        balance: openingBalance,
+        currency,
+        isDefault,
+        isArchived,
+      },
     });
 
-    const accountDetails = await account.save();
-
     if (isDefault) {
-      await Account.updateMany(
-        { userId: req.user.id, _id: { $ne: accountDetails.id } },
-        { $set: { isDefault: false } },
-      );
+      await prisma.account.updateMany({
+        where: {
+          userId: req.user.id,
+          id: {
+            not: accountDetails.id,
+          },
+        },
+        data: {
+          isDefault: false,
+        },
+      });
     }
 
     res.status(201).json({
@@ -45,7 +52,9 @@ async function postAccountDetails(req, res) {
 
 async function getUserAccountDetails(req, res) {
   try {
-    const accountDetails = await Account.find({ userId: req.user.id });
+    const accountDetails = await prisma.account.findMany({
+      where: { userId: req.user.id },
+    });
     res.status(200).json({
       success: true,
       data: accountDetails,
@@ -57,11 +66,25 @@ async function getUserAccountDetails(req, res) {
 
 async function updateUserAccountDetails(req, res) {
   try {
-    const accId = req.params.id;
+    const accountId = req.params.accountId;
     const { name, type, bankName, currency, isDefault, isArchived } = req.body;
 
-    if (!accId) {
+    if (!accountId) {
       throw new Error("Account ID is required");
+    }
+
+    const account = await prisma.account.findFirst({
+      where: {
+        id: accountId,
+        userId: req.user.id,
+      },
+    });
+
+    if (!account) {
+      return res.status(404).json({
+        success: false,
+        message: "Account not found",
+      });
     }
 
     const updateData = {};
@@ -73,35 +96,31 @@ async function updateUserAccountDetails(req, res) {
     if (isDefault !== undefined) updateData.isDefault = isDefault;
     if (isArchived !== undefined) updateData.isArchived = isArchived;
 
-    const updateAccDetails = await Account.findOneAndUpdate(
-      { _id: accId, userId: req.user.id },
-      {
-        $set: updateData,
+    const updatedAccount = await prisma.account.update({
+      where: {
+        id: accountId,
       },
-      {
-        new: true,
-        runValidators: true,
-      },
-    );
-
-    if (!updateAccDetails) {
-      return res.status(404).json({
-        success: false,
-        message: "Account not found",
-      });
-    }
+      data: updateData,
+    });
 
     if (isDefault) {
-      await Account.updateMany(
-        { userId: req.user.id, _id: { $ne: accId } },
-        { $set: { isDefault: false } },
-      );
+      await prisma.account.updateMany({
+        where: {
+          userId: req.user.id,
+          id: {
+            not: accountId,
+          },
+        },
+        data: {
+          isDefault: false,
+        },
+      });
     }
 
     res.status(200).json({
       success: true,
       message: "Account details updated successfully",
-      data: updateAccDetails,
+      data: updatedAccount,
     });
   } catch (err) {
     res.status(400).send({ message: err.message });

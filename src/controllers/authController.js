@@ -1,5 +1,6 @@
-const User = require("../models/user");
-const { validateSignupData } = require("../utils/validation");
+const prisma = require("../config/prisma");
+const { getJWT } = require("../utils/jwt");
+const { validateSignupData, validatePassword } = require("../utils/validation");
 const bcrypt = require("bcrypt");
 
 async function signup(req, res) {
@@ -9,28 +10,26 @@ async function signup(req, res) {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // create a new instance for the user model
-    const user = new User({
-      firstName,
-      lastName,
-      emailId,
-      password: hashedPassword,
+    const user = await prisma.user.create({
+      data: {
+        firstName,
+        lastName,
+        email: emailId,
+        password: hashedPassword,
+      },
     });
-
-    const savedUser = await user.save();
-    const token = await savedUser.getJWT();
+    console.log("user", user);
+    const token = await getJWT(user?.id);
 
     res.cookie("token", token, {
       expires: new Date(Date.now() + 24 * 3600000), // 24h | 1d
     });
 
-    res
-      .status(200)
-      .json({
-        success: true,
-        message: "User Added successfully!",
-        data: savedUser,
-      });
+    res.status(200).json({
+      success: true,
+      message: "User Added successfully!",
+      data: user,
+    });
   } catch (err) {
     res.status(400).json({ success: false, message: err.message });
   }
@@ -39,28 +38,28 @@ async function signup(req, res) {
 async function login(req, res) {
   try {
     const { emailId, password } = req.body;
-    const user = await User.findOne({ emailId: emailId });
+    const user = await prisma.user.findUnique({ where: { email: emailId } });
 
     if (!user) {
       throw new Error("Invalid credentials");
     }
 
-    const isPasswordValid = await user.validatePassword(password);
+    const isPasswordValid = await validatePassword(user, password);
     if (isPasswordValid) {
-      const token = await user.getJWT();
+      const token = await getJWT(user?.id);
 
       res.cookie("token", token, {
         expires: new Date(Date.now() + 24 * 3600000),
       });
 
-      const { _id, firstName, lastName, emailId, createdAt, updatedAt } = user;
+      const { id, firstName, lastName, email, createdAt, updatedAt } = user;
       res.status(200).json({
         success: true,
         data: {
-          _id,
+          id,
           firstName,
           lastName,
-          emailId,
+          emailId: email,
           createdAt,
           updatedAt,
         },

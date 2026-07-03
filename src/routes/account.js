@@ -10,6 +10,10 @@ const accountRouter = express.Router();
 
 accountRouter.post("/account/details", userAuth, postAccountDetails);
 accountRouter.get("/account/details", userAuth, getUserAccountDetails);
-accountRouter.patch("/account/details/:id", userAuth, updateUserAccountDetails);
+accountRouter.patch(
+  "/account/details/:accountId",
+  userAuth,
+  updateUserAccountDetails,
+);
 
 module.exports = accountRouter;

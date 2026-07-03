@@ -25,16 +25,14 @@ enum AccountType {
 //User model
 
 model User {
-  id String @id @default(uuid())
+  id        String    @id @default(uuid())
   firstName String
-  lastName String
-  email String @unique
-  password String
-
-  accounts Account[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  lastName  String
+  email     String    @unique
+  password  String
+  accounts  Account[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 }
 
 // Accounts model
@@ -42,21 +40,18 @@ model User {
 model Account {
   id String @id @default(uuid())
 
-  userId String
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  name String
-  type AccountType
-
-  bankName String?
-  openingBalance Float @default(0)
-  balance Float @default(0)
-  currency String @default("INR")
-  isDefault Boolean @default(false)
-  isArchived Boolean @default(false)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  userId         String
+  user           User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name           String
+  type           AccountType
+  bankName       String?
+  openingBalance Float       @default(0)
+  balance        Float       @default(0)
+  currency       String      @default("INR")
+  isDefault      Boolean     @default(false)
+  isArchived     Boolean     @default(false)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
 
   @@index([userId])
 }

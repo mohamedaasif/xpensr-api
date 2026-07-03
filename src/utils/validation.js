@@ -1,4 +1,5 @@
 const validator = require("validator");
+const bcrypt = require("bcrypt");
 
 const validateSignupData = (req) => {
   const { firstName, lastName, emailId, password } = req.body;
@@ -11,4 +12,13 @@ const validateSignupData = (req) => {
   }
 };
 
-module.exports = { validateSignupData };
+async function validatePassword(user, passwordInputByUser) {
+  const hashedPassword = user.password;
+  const isPasswordValid = await bcrypt.compare(
+    passwordInputByUser,
+    hashedPassword,
+  );
+  return isPasswordValid;
+}
+
+module.exports = { validateSignupData, validatePassword };
