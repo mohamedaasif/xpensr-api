@@ -1,12 +1,11 @@
 import { Request, Response } from "express";
-import { AuthRequest } from "../interfaces/auth.interface";
+import { LoginBody, SignupBody } from "../interfaces/auth.interface";
 import prisma from "../config/prisma";
 import bcrypt from "bcrypt";
 import { validatePassword, validateSignupData } from "../utils/validation";
 import { getJWT } from "../utils/jwt";
-import { LoginRequest } from "../interfaces/user.interface";
 
-export async function signup(req: AuthRequest, res: Response) {
+export async function signup(req: Request<{}, {}, SignupBody>, res: Response) {
   try {
     validateSignupData(req.body);
     const { firstName, lastName, emailId, password } = req.body;
@@ -38,7 +37,7 @@ export async function signup(req: AuthRequest, res: Response) {
   }
 }
 
-export async function login(req: LoginRequest, res: Response) {
+export async function login(req: Request<{}, {}, LoginBody>, res: Response) {
   try {
     const { emailId, password } = req.body;
     const user = await prisma.user.findUnique({ where: { email: emailId } });

@@ -1,12 +1,12 @@
-import { Response } from "express";
+import { Request, Response } from "express";
 import prisma from "../config/prisma";
 import {
-  AccountDetailsRequest,
+  AccountBody,
   UpdateAccountBody,
 } from "../interfaces/account.interface";
 
 export async function postAccountDetails(
-  req: AccountDetailsRequest,
+  req: Request<{}, {}, AccountBody>,
   res: Response,
 ) {
   try {
@@ -22,7 +22,7 @@ export async function postAccountDetails(
 
     const accountDetails = await prisma.account.create({
       data: {
-        userId: req.user.id,
+        userId: req.user!.id,
         name,
         type,
         bankName,
@@ -37,7 +37,7 @@ export async function postAccountDetails(
     if (isDefault) {
       await prisma.account.updateMany({
         where: {
-          userId: req.user.id,
+          userId: req.user!.id,
           id: {
             not: accountDetails.id,
           },
@@ -59,13 +59,10 @@ export async function postAccountDetails(
   }
 }
 
-export async function getUserAccountDetails(
-  req: AccountDetailsRequest,
-  res: Response,
-) {
+export async function getUserAccountDetails(req: Request, res: Response) {
   try {
     const accountDetails = await prisma.account.findMany({
-      where: { userId: req.user.id },
+      where: { userId: req.user!.id },
     });
     res.status(200).json({
       success: true,
@@ -79,7 +76,7 @@ export async function getUserAccountDetails(
 }
 
 export async function updateUserAccountDetails(
-  req: AccountDetailsRequest,
+  req: Request<{ accountId: string }, {}, UpdateAccountBody>,
   res: Response,
 ) {
   try {
@@ -93,7 +90,7 @@ export async function updateUserAccountDetails(
     const account = await prisma.account.findFirst({
       where: {
         id: accountId,
-        userId: req.user.id,
+        userId: req.user!.id,
       },
     });
 
@@ -123,7 +120,7 @@ export async function updateUserAccountDetails(
     if (isDefault) {
       await prisma.account.updateMany({
         where: {
-          userId: req.user.id,
+          userId: req.user!.id,
           id: {
             not: accountId,
           },
