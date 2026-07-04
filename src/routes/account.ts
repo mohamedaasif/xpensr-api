@@ -1,10 +1,10 @@
-const express = require("express");
-const { userAuth } = require("../middleware/auth");
-const {
-  postAccountDetails,
+import express from "express";
+import userAuth from "../middleware/auth";
+import {
   getUserAccountDetails,
+  postAccountDetails,
   updateUserAccountDetails,
-} = require("../controllers/accountController");
+} from "../controllers/accountController";
 
 const accountRouter = express.Router();
 
@@ -16,4 +16,4 @@ accountRouter.patch(
   updateUserAccountDetails,
 );
 
-module.exports = accountRouter;
+export default accountRouter;

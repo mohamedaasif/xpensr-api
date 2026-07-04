@@ -1,11 +1,14 @@
-const prisma = require("../config/prisma");
-const { getJWT } = require("../utils/jwt");
-const { validateSignupData, validatePassword } = require("../utils/validation");
-const bcrypt = require("bcrypt");
+import { Request, Response } from "express";
+import { AuthRequest } from "../interfaces/auth.interface";
+import prisma from "../config/prisma";
+import bcrypt from "bcrypt";
+import { validatePassword, validateSignupData } from "../utils/validation";
+import { getJWT } from "../utils/jwt";
+import { LoginRequest } from "../interfaces/user.interface";
 
-async function signup(req, res) {
+export async function signup(req: AuthRequest, res: Response) {
   try {
-    validateSignupData(req);
+    validateSignupData(req.body);
     const { firstName, lastName, emailId, password } = req.body;
 
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -18,7 +21,6 @@ async function signup(req, res) {
         password: hashedPassword,
       },
     });
-    console.log("user", user);
     const token = await getJWT(user?.id);
 
     res.cookie("token", token, {
@@ -31,11 +33,12 @@ async function signup(req, res) {
       data: user,
     });
   } catch (err) {
-    res.status(400).json({ success: false, message: err.message });
+    const error = err as Error;
+    res.status(400).json({ success: false, message: error.message });
   }
 }
 
-async function login(req, res) {
+export async function login(req: LoginRequest, res: Response) {
   try {
     const { emailId, password } = req.body;
     const user = await prisma.user.findUnique({ where: { email: emailId } });
@@ -68,15 +71,15 @@ async function login(req, res) {
       throw new Error("Invalid credentials");
     }
   } catch (err) {
-    res.status(400).json({ success: false, message: err.message });
+    const error = err as Error;
+
+    res.status(400).json({ success: false, message: error.message });
   }
 }
 
-async function logout(req, res) {
+export async function logout(req: Request, res: Response) {
   res.cookie("token", null, {
     expires: new Date(Date.now()),
   });
   res.send("Logout successful");
 }
-
-module.exports = { signup, login, logout };

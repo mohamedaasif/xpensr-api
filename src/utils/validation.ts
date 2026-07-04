@@ -1,8 +1,14 @@
-const validator = require("validator");
-const bcrypt = require("bcrypt");
+import { User } from "@prisma/client";
+import validator from "validator";
+import bcrypt from "bcrypt";
 
-const validateSignupData = (req) => {
-  const { firstName, lastName, emailId, password } = req.body;
+export const validateSignupData = (data: {
+  firstName: string;
+  lastName: string;
+  emailId: string;
+  password: string;
+}) => {
+  const { firstName, lastName, emailId, password } = data;
   if (!firstName || !lastName) {
     throw new Error("Name is not valid!");
   } else if (!validator.isEmail(emailId)) {
@@ -12,7 +18,10 @@ const validateSignupData = (req) => {
   }
 };
 
-async function validatePassword(user, passwordInputByUser) {
+export async function validatePassword(
+  user: User,
+  passwordInputByUser: string,
+) {
   const hashedPassword = user.password;
   const isPasswordValid = await bcrypt.compare(
     passwordInputByUser,
@@ -20,5 +29,3 @@ async function validatePassword(user, passwordInputByUser) {
   );
   return isPasswordValid;
 }
-
-module.exports = { validateSignupData, validatePassword };

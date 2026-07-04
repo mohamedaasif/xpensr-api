@@ -1,6 +1,14 @@
-const prisma = require("../config/prisma");
+import { Response } from "express";
+import prisma from "../config/prisma";
+import {
+  AccountDetailsRequest,
+  UpdateAccountBody,
+} from "../interfaces/account.interface";
 
-async function postAccountDetails(req, res) {
+export async function postAccountDetails(
+  req: AccountDetailsRequest,
+  res: Response,
+) {
   try {
     const {
       name,
@@ -46,11 +54,15 @@ async function postAccountDetails(req, res) {
       data: accountDetails,
     });
   } catch (err) {
-    res.status(400).send({ message: err.message });
+    const error = err as Error;
+    res.status(400).send({ message: error.message });
   }
 }
 
-async function getUserAccountDetails(req, res) {
+export async function getUserAccountDetails(
+  req: AccountDetailsRequest,
+  res: Response,
+) {
   try {
     const accountDetails = await prisma.account.findMany({
       where: { userId: req.user.id },
@@ -60,11 +72,16 @@ async function getUserAccountDetails(req, res) {
       data: accountDetails,
     });
   } catch (err) {
-    res.status(400).send({ message: err.message });
+    const error = err as Error;
+
+    res.status(400).send({ message: error.message });
   }
 }
 
-async function updateUserAccountDetails(req, res) {
+export async function updateUserAccountDetails(
+  req: AccountDetailsRequest,
+  res: Response,
+) {
   try {
     const accountId = req.params.accountId;
     const { name, type, bankName, currency, isDefault, isArchived } = req.body;
@@ -87,7 +104,7 @@ async function updateUserAccountDetails(req, res) {
       });
     }
 
-    const updateData = {};
+    const updateData: UpdateAccountBody = {};
 
     if (name !== undefined) updateData.name = name;
     if (type !== undefined) updateData.type = type;
@@ -116,19 +133,14 @@ async function updateUserAccountDetails(req, res) {
         },
       });
     }
-
     res.status(200).json({
       success: true,
       message: "Account details updated successfully",
       data: updatedAccount,
     });
   } catch (err) {
-    res.status(400).send({ message: err.message });
+    const error = err as Error;
+
+    res.status(400).send({ message: error.message });
   }
 }
-
-module.exports = {
-  postAccountDetails,
-  getUserAccountDetails,
-  updateUserAccountDetails,
-};
