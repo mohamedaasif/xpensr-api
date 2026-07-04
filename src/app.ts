@@ -2,6 +2,7 @@ import express from "express";
 import authRouter from "./routes/auth";
 import profileRouter from "./routes/profile";
 import accountRouter from "./routes/account";
+import transactionRouter from "./routes/transaction";
 const cookieParser = require("cookie-parser");
 const cors = require("cors");
 require("dotenv").config();
@@ -17,13 +18,10 @@ app.use(
 app.use(express.json());
 app.use(cookieParser());
 
-// const authRouter = require("./routes/auth");
-// const profileRouter = require("./routes/profile");
-// const accountRouter = require("./routes/account");
-
 app.use("/", authRouter);
 app.use("/", profileRouter);
 app.use("/", accountRouter);
+app.use("/", transactionRouter);
 
 app.listen(process.env.PORT, () => {
   console.log(`Server is successfully listening on port: ${process.env.PORT}`);
