@@ -22,36 +22,73 @@ enum AccountType {
   Investment
 }
 
-//User model
+enum TransactionType {
+  Income
+  Expense
+  Transfer
+}
 
+enum PaymentType {
+  UPI
+  Cash
+  Card
+  BankTransfer
+  Cheque
+}
+
+// User model
 model User {
-  id        String    @id @default(uuid())
-  firstName String
-  lastName  String
-  email     String    @unique
-  password  String
-  accounts  Account[]
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  id           String        @id @default(uuid())
+  firstName    String
+  lastName     String
+  email        String        @unique
+  password     String
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  accounts     Account[]
+  transactions Transaction[]
 }
 
 // Accounts model
-
 model Account {
-  id String @id @default(uuid())
-
+  id             String        @id @default(uuid())
   userId         String
-  user           User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   name           String
   type           AccountType
   bankName       String?
-  openingBalance Float       @default(0)
-  balance        Float       @default(0)
-  currency       String      @default("INR")
-  isDefault      Boolean     @default(false)
-  isArchived     Boolean     @default(false)
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
+  openingBalance Float         @default(0)
+  balance        Float         @default(0)
+  currency       String        @default("INR")
+  isDefault      Boolean       @default(false)
+  isArchived     Boolean       @default(false)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  transactions   Transaction[]
 
   @@index([userId])
+}
+
+// Transaction model
+model Transaction {
+  id              String          @id @default(uuid())
+  userId          String
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accountId       String
+  account         Account         @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  type            TransactionType
+  amount          Float
+  description     String
+  notes           String?
+  transactionDate DateTime
+  paymentMethod   PaymentType
+  referenceNo     String?
+  location        String?
+  isRecurring     Boolean         @default(false)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@index([userId])
+  @@index([accountId])
+  @@index([transactionDate])
 }

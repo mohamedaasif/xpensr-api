@@ -1,9 +1,8 @@
 import jwt, { JwtPayload } from "jsonwebtoken";
 import prisma from "../config/prisma";
-import { NextFunction, Response } from "express";
-import { AuthRequest } from "../interfaces/auth-request";
+import { NextFunction, Request, Response } from "express";
 
-async function userAuth(req: AuthRequest, res: Response, next: NextFunction) {
+async function userAuth(req: Request, res: Response, next: NextFunction) {
   try {
     const { token } = req.cookies;
     if (!token) {

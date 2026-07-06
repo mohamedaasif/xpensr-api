@@ -1,7 +1,6 @@
-import { Response } from "express";
-import { AuthRequest } from "../interfaces/auth.interface";
+import { Request, Response } from "express";
 
-async function getProfile(req: AuthRequest, res: Response) {
+async function getProfile(req: Request, res: Response) {
   try {
     const user = req.user;
     res.send(user);
