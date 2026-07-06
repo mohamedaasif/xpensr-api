@@ -5,17 +5,20 @@ import {
   getAllTransactions,
   updateTransaction,
 } from "../controllers/transactionController";
+import userAuth from "../middleware/auth";
 
 const transactionRouter = express.Router();
 
-transactionRouter.post("/add/transaction", addTransaction);
-transactionRouter.get("/all/transactions", getAllTransactions);
+transactionRouter.post("/add/transaction", userAuth, addTransaction);
+transactionRouter.get("/all/transactions", userAuth, getAllTransactions);
 transactionRouter.patch(
   "/update/transaction/:transactionId",
+  userAuth,
   updateTransaction,
 );
 transactionRouter.delete(
   "/delete/transaction/:transactionId",
+  userAuth,
   deleteTransaction,
 );
 

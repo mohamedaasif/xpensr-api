@@ -1,5 +1,3 @@
-import { Request } from "express";
-
 export interface LoginBody {
   emailId: string;
   password: string;
