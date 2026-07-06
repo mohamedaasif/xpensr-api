@@ -3,9 +3,12 @@ import authRouter from "./routes/auth";
 import profileRouter from "./routes/profile";
 import accountRouter from "./routes/account";
 import transactionRouter from "./routes/transaction";
-const cookieParser = require("cookie-parser");
-const cors = require("cors");
-require("dotenv").config();
+import dashboardRouter from "./routes/dashboard";
+import cookieParser from "cookie-parser";
+import cors from "cors";
+import dotenv from "dotenv";
+
+dotenv.config();
 
 const app = express();
 
@@ -22,6 +25,7 @@ app.use("/", authRouter);
 app.use("/", profileRouter);
 app.use("/", accountRouter);
 app.use("/", transactionRouter);
+app.use("/", dashboardRouter);
 
 app.listen(process.env.PORT, () => {
   console.log(`Server is successfully listening on port: ${process.env.PORT}`);
