@@ -9,7 +9,7 @@ const dashboardRouter = express.Router();
 
 dashboardRouter.get("/dashboard/summary", userAuth, getDashboardSummary);
 dashboardRouter.get(
-  "/dashboard/recent/transacation",
+  "/dashboard/recent/transaction",
   userAuth,
   getRecentTransactions,
 );
