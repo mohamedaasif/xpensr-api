@@ -51,6 +51,9 @@ export const getRecentTransactions = async (req: Request, res: Response) => {
       where: { userId },
       orderBy: { transactionDate: "desc" },
       take: 5,
+      include: {
+        account: true, // TODO - value should come from req
+      },
     });
     if (!recentTransaction) {
       return res.status(200).json({
