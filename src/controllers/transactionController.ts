@@ -95,6 +95,9 @@ export const getAllTransactions = async (req: Request, res: Response) => {
       orderBy: {
         transactionDate: "desc",
       },
+      include: {
+        account: true,
+      },
     });
     return res.status(200).json({
       success: true,
