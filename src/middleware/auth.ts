@@ -26,6 +26,8 @@ async function userAuth(req: Request, res: Response, next: NextFunction) {
         firstName: true,
         lastName: true,
         email: true,
+        phone: true,
+        dob: true,
         createdAt: true,
         updatedAt: true,
       },

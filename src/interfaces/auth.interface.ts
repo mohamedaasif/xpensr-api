@@ -15,6 +15,10 @@ export interface AuthUser {
   firstName: string;
   lastName: string;
   email: string;
+  phone?: string | null;
+  dob?: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
+
+export type UpdateUserDto = Partial<Omit<AuthUser, "id" | "email">>;
