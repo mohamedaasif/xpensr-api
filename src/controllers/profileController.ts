@@ -57,6 +57,7 @@ export async function updateProfile(req: Request, res: Response) {
         email: true,
         phone: true,
         dob: true,
+        countryCode: true,
         createdAt: true,
         updatedAt: true,
       },

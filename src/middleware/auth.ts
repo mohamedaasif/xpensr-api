@@ -28,6 +28,7 @@ async function userAuth(req: Request, res: Response, next: NextFunction) {
         email: true,
         phone: true,
         dob: true,
+        countryCode: true,
         createdAt: true,
         updatedAt: true,
       },
