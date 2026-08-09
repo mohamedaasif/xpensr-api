@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import prisma from "../config/prisma";
-import { PaymentType, TransactionType } from "@prisma/client";
+import { AccountType, PaymentType, TransactionType } from "@prisma/client";
 
 export const getDashboardSummary = async (req: Request, res: Response) => {
   try {
@@ -29,7 +29,7 @@ export const getDashboardSummary = async (req: Request, res: Response) => {
       currentMonthExpense,
     ] = await Promise.all([
       prisma.account.aggregate({
-        where: { userId },
+        where: { userId, NOT: { type: AccountType.Credit_Card } },
         _sum: {
           balance: true,
         },
