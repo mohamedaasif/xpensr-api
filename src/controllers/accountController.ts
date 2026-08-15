@@ -4,6 +4,7 @@ import {
   AccountBody,
   UpdateAccountBody,
 } from "../interfaces/account.interface";
+import { AccountType } from "@prisma/client";
 
 export async function postAccountDetails(
   req: Request<{}, {}, AccountBody>,
@@ -139,5 +140,90 @@ export async function updateUserAccountDetails(
     const error = err as Error;
 
     res.status(400).send({ message: error.message });
+  }
+}
+
+export async function deleteUserAccountDetails(
+  req: Request<{ accountId: string }>,
+  res: Response,
+) {
+  try {
+    const accountId = req.params.accountId;
+    const userId = req.user!.id;
+
+    if (!accountId) {
+      throw new Error("Account ID is required");
+    }
+
+    const account = await prisma.account.findFirst({
+      where: {
+        id: accountId,
+        userId,
+      },
+    });
+
+    if (!account) {
+      return res.status(404).json({
+        success: false,
+        message: "Account not found",
+      });
+    }
+
+    if (account.isDefault) {
+      const nextDefaultAccount = await prisma.account.findFirst({
+        where: {
+          userId,
+          id: {
+            not: accountId,
+          },
+          type: {
+            notIn: [AccountType.Investment, AccountType.Credit_Card],
+          },
+        },
+      });
+
+      if (!nextDefaultAccount) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Cannot delete the default account because no other eligible account is available",
+        });
+      }
+
+      await prisma.$transaction(async (tx) => {
+        await tx.account.update({
+          where: {
+            id: nextDefaultAccount.id,
+          },
+          data: {
+            isDefault: true,
+          },
+        });
+
+        await tx.account.delete({
+          where: {
+            id: accountId,
+          },
+        });
+      });
+    } else {
+      await prisma.account.delete({
+        where: {
+          id: accountId,
+        },
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Account deleted",
+    });
+  } catch (err) {
+    const error = err as Error;
+
+    return res.status(400).json({
+      success: false,
+      message: error.message,
+    });
   }
 }

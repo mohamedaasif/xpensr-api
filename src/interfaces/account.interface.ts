@@ -3,7 +3,7 @@ import { AccountType } from "@prisma/client";
 export interface AccountBody {
   name: string;
   type: AccountType;
-  bankName?: string;
+  bankName: string;
   openingBalance: number;
   currency: string;
   isDefault: boolean;

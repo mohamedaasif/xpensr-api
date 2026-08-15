@@ -77,8 +77,8 @@ model Transaction {
   id              String          @id @default(uuid())
   userId          String
   user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  accountId       String
-  account         Account         @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  accountId       String?
+  account         Account?        @relation(fields: [accountId], references: [id], onDelete: SetNull)
   type            TransactionType
   amount          Float
   description     String

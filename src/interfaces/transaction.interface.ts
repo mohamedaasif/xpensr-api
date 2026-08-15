@@ -15,6 +15,7 @@ export interface TransactionBody {
 
 export interface UpdateTransactionBody {
   type?: TransactionType;
+  accountId?: string;
   amount?: number;
   description?: string;
   notes?: string;
