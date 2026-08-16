@@ -127,15 +127,21 @@ export const updateTransaction = async (
       isRecurring,
       referenceNo,
       transactionDate,
+      accountId,
     } = req.body;
+
     const transactionId = req.params.transactionId;
+    const userId = req.user!.id;
 
     if (!transactionId) {
       throw new Error("Transaction id is required");
     }
 
-    const transactionDetails = await prisma.transaction.findUnique({
-      where: { id: transactionId, userId: req.user!.id },
+    const transactionDetails = await prisma.transaction.findFirst({
+      where: {
+        id: transactionId,
+        userId,
+      },
     });
 
     if (!transactionDetails) {
@@ -145,36 +151,29 @@ export const updateTransaction = async (
       });
     }
 
-    const accountDetails = await prisma.account.findUnique({
-      where: { id: transactionDetails.accountId },
-    });
+    const existingAccountId = transactionDetails.accountId;
 
-    if (!accountDetails) {
-      return res.status(404).json({
-        success: false,
-        message: "Account not found",
-      });
+    if (accountId === null) {
+      throw new Error("Transaction cannot be unlinked manually");
     }
 
-    let updatedBalance = 0;
+    const newAccountId =
+      accountId !== undefined ? accountId : existingAccountId;
 
-    if (type !== undefined || amount !== undefined) {
-      const newType = type ?? transactionDetails.type;
-      const newAmount = amount ?? transactionDetails.amount;
+    const newType = type ?? transactionDetails.type;
+    const newAmount = amount ?? transactionDetails.amount;
 
-      const oldEffect =
-        transactionDetails.type === TransactionType.Income
-          ? transactionDetails.amount
-          : -transactionDetails.amount;
+    const oldEffect =
+      transactionDetails.type === TransactionType.Income
+        ? transactionDetails.amount
+        : -transactionDetails.amount;
 
-      const newEffect =
-        newType === TransactionType.Income ? newAmount : -newAmount;
-
-      updatedBalance = accountDetails.balance - oldEffect + newEffect;
-    }
+    const newEffect =
+      newType === TransactionType.Income ? newAmount : -newAmount;
 
     let updateData: UpdateTransactionBody = {};
 
+    if (accountId !== undefined) updateData.accountId = accountId;
     if (type !== undefined) updateData.type = type;
     if (amount !== undefined) updateData.amount = amount;
     if (description !== undefined) updateData.description = description;
@@ -183,23 +182,126 @@ export const updateTransaction = async (
     if (paymentMethod !== undefined) updateData.paymentMethod = paymentMethod;
     if (isRecurring !== undefined) updateData.isRecurring = isRecurring;
     if (referenceNo !== undefined) updateData.referenceNo = referenceNo;
-    if (transactionDate !== undefined)
+    if (transactionDate !== undefined) {
       updateData.transactionDate = new Date(transactionDate);
+    }
 
     const updatedTransaction = await prisma.$transaction(async (tx) => {
-      const transaction = await tx.transaction.update({
-        where: { id: transactionId },
-        data: updateData,
-      });
+      let existingAccount = null;
 
-      if (type !== undefined || amount !== undefined) {
+      if (existingAccountId) {
+        existingAccount = await tx.account.findFirst({
+          where: {
+            id: existingAccountId,
+            userId,
+          },
+        });
+
+        if (!existingAccount) {
+          throw new Error("Existing account not found");
+        }
+      }
+
+      let newAccount = null;
+
+      if (newAccountId) {
+        newAccount = await tx.account.findFirst({
+          where: {
+            id: newAccountId,
+            userId,
+          },
+        });
+
+        if (!newAccount) {
+          throw new Error("Account not found");
+        }
+      }
+      // Link orphaned transaction
+      if (!existingAccountId && newAccount) {
+        const updatedBalance = newAccount.balance + newEffect;
+
+        if (newType === TransactionType.Expense && updatedBalance < 0) {
+          throw new Error(
+            `Insufficient balance. Available balance is ${newAccount.balance}`,
+          );
+        }
+
         await tx.account.update({
-          where: { id: transactionDetails.accountId },
-          data: { balance: updatedBalance },
+          where: {
+            id: newAccount.id,
+          },
+          data: {
+            balance: updatedBalance,
+          },
+        });
+      }
+      // Same account
+      else if (
+        existingAccount &&
+        newAccount &&
+        existingAccountId === newAccountId
+      ) {
+        if (type !== undefined || amount !== undefined) {
+          const updatedBalance =
+            existingAccount.balance - oldEffect + newEffect;
+
+          if (newType === TransactionType.Expense && updatedBalance < 0) {
+            throw new Error(
+              `Insufficient balance. Available balance is ${
+                existingAccount.balance - oldEffect
+              }`,
+            );
+          }
+
+          await tx.account.update({
+            where: {
+              id: existingAccount.id,
+            },
+            data: {
+              balance: updatedBalance,
+            },
+          });
+        }
+      } else if (
+        existingAccount &&
+        newAccount &&
+        existingAccountId !== newAccountId
+      ) {
+        const restoredOldBalance = existingAccount.balance - oldEffect;
+
+        await tx.account.update({
+          where: {
+            id: existingAccount.id,
+          },
+          data: {
+            balance: restoredOldBalance,
+          },
+        });
+
+        const updatedNewBalance = newAccount.balance + newEffect;
+
+        if (newType === TransactionType.Expense && updatedNewBalance < 0) {
+          throw new Error(
+            `Insufficient balance. Available balance is ${newAccount.balance}`,
+          );
+        }
+
+        await tx.account.update({
+          where: {
+            id: newAccount.id,
+          },
+          data: {
+            balance: updatedNewBalance,
+          },
         });
       }
 
-      return transaction;
+      return tx.transaction.update({
+        where: {
+          id: transactionId,
+        },
+        data: updateData,
+      });
     });
 
     return res.status(200).json({
@@ -209,7 +311,8 @@ export const updateTransaction = async (
     });
   } catch (err) {
     const error = err as Error;
-    res.status(400).json({
+
+    return res.status(400).json({
       success: false,
       message: error.message,
     });
@@ -226,7 +329,7 @@ export const deleteTransaction = async (
       throw new Error("Transaction id is required");
     }
 
-    const transactionDetails = await prisma.transaction.findUnique({
+    const transactionDetails = await prisma.transaction.findFirst({
       where: { id: transactionId, userId: req.user!.id },
     });
 
@@ -237,37 +340,48 @@ export const deleteTransaction = async (
       });
     }
 
-    const accountDetails = await prisma.account.findUnique({
-      where: { id: transactionDetails.accountId },
-    });
-
-    if (!accountDetails) {
-      return res.status(404).json({
-        success: false,
-        message: "Account not found",
-      });
-    }
-
-    let updatedBalance = accountDetails.balance;
-
-    if (transactionDetails.type === TransactionType.Expense) {
-      updatedBalance += transactionDetails.amount;
-    } else if (transactionDetails.type === TransactionType.Income) {
-      updatedBalance -= transactionDetails.amount;
-    }
-
-    await prisma.$transaction(async (tx) => {
-      await tx.account.update({
-        where: { id: accountDetails.id },
-        data: {
-          balance: updatedBalance,
-        },
+    if (transactionDetails.accountId) {
+      const accountDetails = await prisma.account.findFirst({
+        where: { id: transactionDetails.accountId, userId: req.user!.id },
       });
 
-      await tx.transaction.delete({
+      if (!accountDetails) {
+        return res.status(404).json({
+          success: false,
+          message: "Account not found",
+        });
+      }
+
+      await prisma.$transaction(async (tx) => {
+        if (transactionDetails.type === TransactionType.Expense) {
+          await tx.account.update({
+            where: { id: accountDetails.id },
+            data: {
+              balance: {
+                increment: transactionDetails.amount,
+              },
+            },
+          });
+        } else if (transactionDetails.type === TransactionType.Income) {
+          await tx.account.update({
+            where: { id: accountDetails.id },
+            data: {
+              balance: {
+                decrement: transactionDetails.amount,
+              },
+            },
+          });
+        }
+
+        await tx.transaction.delete({
+          where: { id: transactionId },
+        });
+      });
+    } else {
+      await prisma.transaction.delete({
         where: { id: transactionId },
       });
-    });
+    }
 
     return res.status(200).json({
       success: true,
