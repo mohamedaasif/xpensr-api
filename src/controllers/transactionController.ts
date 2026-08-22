@@ -13,6 +13,7 @@ export const addTransaction = async (
   try {
     const {
       accountId,
+      toAccountId,
       type,
       amount,
       description,
@@ -25,6 +26,10 @@ export const addTransaction = async (
     } = req.body;
 
     if (!accountId) throw new Error("Account Id is required");
+    if (type === TransactionType.Transfer && !toAccountId)
+      throw new Error("toAccountId field is required for Transfer type");
+    if (type === TransactionType.Transfer && accountId === toAccountId)
+      throw new Error("From Account and To Account should be different");
 
     const accountDetails = await prisma.account.findUnique({
       where: { id: accountId, userId: req.user!.id },
@@ -37,11 +42,17 @@ export const addTransaction = async (
       });
     }
 
-    let updatedBalance = accountDetails.balance;
-    if (type === TransactionType.Expense) {
-      updatedBalance -= amount;
-    } else if (type === TransactionType.Income) {
-      updatedBalance += amount;
+    if (type === TransactionType.Transfer) {
+      const toAccountDetails = await prisma.account.findUnique({
+        where: { id: toAccountId, userId: req.user!.id },
+      });
+
+      if (!toAccountDetails) {
+        return res.status(404).json({
+          success: false,
+          message: "Transfer to account is not found",
+        });
+      }
     }
 
     const transactionDetails = await prisma.$transaction(async (tx) => {
@@ -49,6 +60,7 @@ export const addTransaction = async (
         data: {
           userId: req.user!.id,
           accountId,
+          toAccountId,
           type,
           amount,
           description,
@@ -61,12 +73,63 @@ export const addTransaction = async (
         },
       });
 
-      await tx.account.update({
-        where: { id: accountId },
-        data: {
-          balance: updatedBalance,
-        },
-      });
+      if (type === TransactionType.Expense) {
+        await tx.account.update({
+          where: {
+            id: accountId,
+          },
+          data: {
+            balance: {
+              decrement: amount,
+            },
+          },
+        });
+      }
+
+      if (type === TransactionType.Income) {
+        await tx.account.update({
+          where: {
+            id: accountId,
+          },
+          data: {
+            balance: {
+              increment: amount,
+            },
+          },
+        });
+      }
+
+      if (type === TransactionType.Transfer) {
+        const sourceUpdate = await tx.account.updateMany({
+          where: {
+            id: accountId,
+            userId: req.user!.id,
+            balance: {
+              gte: amount,
+            },
+          },
+          data: {
+            balance: {
+              decrement: amount,
+            },
+          },
+        });
+
+        if (sourceUpdate.count !== 1) {
+          throw new Error("Insufficient balance");
+        }
+
+        await tx.account.update({
+          where: {
+            id: toAccountId,
+          },
+          data: {
+            balance: {
+              increment: amount,
+            },
+          },
+        });
+      }
       return transaction;
     });
 

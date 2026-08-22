@@ -54,20 +54,22 @@ model User {
 
 // Accounts model
 model Account {
-  id             String        @id @default(uuid())
+  id             String      @id @default(uuid())
   userId         String
-  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user           User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   name           String
   type           AccountType
   bankName       String
-  openingBalance Float         @default(0)
-  balance        Float         @default(0)
-  currency       String        @default("INR")
-  isDefault      Boolean       @default(false)
-  isArchived     Boolean       @default(false)
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
-  transactions   Transaction[]
+  openingBalance Float       @default(0)
+  balance        Float       @default(0)
+  currency       String      @default("INR")
+  isDefault      Boolean     @default(false)
+  isArchived     Boolean     @default(false)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  fromTransactions Transaction[] @relation("fromAccount")
+  toTransactions   Transaction[] @relation("toAccount")
 
   @@index([userId])
 }
@@ -78,7 +80,9 @@ model Transaction {
   userId          String
   user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   accountId       String?
-  account         Account?        @relation(fields: [accountId], references: [id], onDelete: SetNull)
+  account         Account?        @relation("fromAccount", fields: [accountId], references: [id], onDelete: SetNull)
+  toAccountId     String?
+  toAccount       Account?        @relation("toAccount", fields: [toAccountId], references: [id], onDelete: SetNull)
   type            TransactionType
   amount          Float
   description     String
@@ -93,5 +97,6 @@ model Transaction {
 
   @@index([userId])
   @@index([accountId])
+  @@index([toAccountId])
   @@index([transactionDate])
 }

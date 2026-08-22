@@ -2,6 +2,7 @@ import { PaymentType, TransactionType } from "@prisma/client";
 
 export interface TransactionBody {
   accountId: string;
+  toAccountId?: string;
   type: TransactionType;
   amount: number;
   description: string;
@@ -16,6 +17,7 @@ export interface TransactionBody {
 export interface UpdateTransactionBody {
   type?: TransactionType;
   accountId?: string;
+  toAccountId?: string;
   amount?: number;
   description?: string;
   notes?: string;
