@@ -403,31 +403,58 @@ export const deleteTransaction = async (
       });
     }
 
-    if (transactionDetails.accountId) {
-      const accountDetails = await prisma.account.findFirst({
-        where: { id: transactionDetails.accountId, userId: req.user!.id },
-      });
-
-      if (!accountDetails) {
-        return res.status(404).json({
-          success: false,
-          message: "Account not found",
+    await prisma.$transaction(async (tx) => {
+      if (
+        transactionDetails.type === TransactionType.Expense &&
+        transactionDetails.accountId
+      ) {
+        await tx.account.update({
+          where: {
+            id: transactionDetails.accountId,
+          },
+          data: {
+            balance: {
+              increment: transactionDetails.amount,
+            },
+          },
         });
       }
 
-      await prisma.$transaction(async (tx) => {
-        if (transactionDetails.type === TransactionType.Expense) {
+      if (
+        transactionDetails.type === TransactionType.Income &&
+        transactionDetails.accountId
+      ) {
+        await tx.account.update({
+          where: {
+            id: transactionDetails.accountId,
+          },
+          data: {
+            balance: {
+              decrement: transactionDetails.amount,
+            },
+          },
+        });
+      }
+
+      if (transactionDetails.type === TransactionType.Transfer) {
+        if (transactionDetails.accountId) {
           await tx.account.update({
-            where: { id: accountDetails.id },
+            where: {
+              id: transactionDetails.accountId,
+            },
             data: {
               balance: {
                 increment: transactionDetails.amount,
               },
             },
           });
-        } else if (transactionDetails.type === TransactionType.Income) {
+        }
+
+        if (transactionDetails.toAccountId) {
           await tx.account.update({
-            where: { id: accountDetails.id },
+            where: {
+              id: transactionDetails.toAccountId,
+            },
             data: {
               balance: {
                 decrement: transactionDetails.amount,
@@ -435,16 +462,14 @@ export const deleteTransaction = async (
             },
           });
         }
+      }
 
-        await tx.transaction.delete({
-          where: { id: transactionId },
-        });
+      await tx.transaction.delete({
+        where: {
+          id: transactionDetails.id,
+        },
       });
-    } else {
-      await prisma.transaction.delete({
-        where: { id: transactionId },
-      });
-    }
+    });
 
     return res.status(200).json({
       success: true,
