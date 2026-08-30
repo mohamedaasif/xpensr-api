@@ -60,7 +60,7 @@ export const addTransaction = async (
         data: {
           userId: req.user!.id,
           accountId,
-          toAccountId,
+          toAccountId: type === TransactionType.Transfer ? toAccountId : null,
           type,
           amount,
           description,
@@ -191,6 +191,7 @@ export const updateTransaction = async (
       referenceNo,
       transactionDate,
       accountId,
+      toAccountId,
     } = req.body;
 
     const transactionId = req.params.transactionId;
@@ -198,6 +199,14 @@ export const updateTransaction = async (
 
     if (!transactionId) {
       throw new Error("Transaction id is required");
+    }
+
+    if (amount !== undefined && amount <= 0) {
+      throw new Error("Amount must be greater than zero");
+    }
+
+    if (accountId === null) {
+      throw new Error("Transaction cannot be unlinked manually");
     }
 
     const transactionDetails = await prisma.transaction.findFirst({
@@ -215,10 +224,7 @@ export const updateTransaction = async (
     }
 
     const existingAccountId = transactionDetails.accountId;
-
-    if (accountId === null) {
-      throw new Error("Transaction cannot be unlinked manually");
-    }
+    const existingToAccountId = transactionDetails.toAccountId;
 
     const newAccountId =
       accountId !== undefined ? accountId : existingAccountId;
@@ -226,30 +232,58 @@ export const updateTransaction = async (
     const newType = type ?? transactionDetails.type;
     const newAmount = amount ?? transactionDetails.amount;
 
-    const oldEffect =
-      transactionDetails.type === TransactionType.Income
-        ? transactionDetails.amount
-        : -transactionDetails.amount;
+    let newToAccountId =
+      toAccountId !== undefined ? toAccountId : existingToAccountId;
 
-    const newEffect =
-      newType === TransactionType.Income ? newAmount : -newAmount;
+    if (!newAccountId) {
+      throw new Error("Account Id is required");
+    }
 
-    let updateData: UpdateTransactionBody = {};
+    if (
+      newType !== TransactionType.Income &&
+      newType !== TransactionType.Expense &&
+      newType !== TransactionType.Transfer
+    ) {
+      throw new Error("Invalid transaction type");
+    }
 
-    if (accountId !== undefined) updateData.accountId = accountId;
-    if (type !== undefined) updateData.type = type;
-    if (amount !== undefined) updateData.amount = amount;
+    if (newType === TransactionType.Transfer) {
+      if (!newToAccountId) {
+        throw new Error("toAccountId field is required for Transfer type");
+      }
+
+      if (newAccountId === newToAccountId) {
+        throw new Error("From Account and To Account should be different");
+      }
+    } else {
+      // Income / Expense should not have destination account
+      newToAccountId = null;
+    }
+
+    const updateData: UpdateTransactionBody = {
+      accountId: newAccountId,
+      toAccountId: newToAccountId,
+      type: newType,
+      amount: newAmount,
+    };
+
     if (description !== undefined) updateData.description = description;
     if (notes !== undefined) updateData.notes = notes;
     if (location !== undefined) updateData.location = location;
     if (paymentMethod !== undefined) updateData.paymentMethod = paymentMethod;
     if (isRecurring !== undefined) updateData.isRecurring = isRecurring;
     if (referenceNo !== undefined) updateData.referenceNo = referenceNo;
-    if (transactionDate !== undefined) {
+    if (transactionDate !== undefined)
       updateData.transactionDate = new Date(transactionDate);
-    }
 
+    // ATOMIC TRANSACTION
     const updatedTransaction = await prisma.$transaction(async (tx) => {
+      // =======================================================
+      // OLD SOURCE ACCOUNT
+      //
+      // This can be null because account may have been deleted.
+      // =======================================================
+
       let existingAccount = null;
 
       if (existingAccountId) {
@@ -259,106 +293,218 @@ export const updateTransaction = async (
             userId,
           },
         });
-
-        if (!existingAccount) {
-          throw new Error("Existing account not found");
-        }
       }
 
-      let newAccount = null;
+      // =======================================================
+      // OLD DESTINATION ACCOUNT
+      //
+      // This can also be null because account may have
+      // been deleted.
+      // =======================================================
 
-      if (newAccountId) {
-        newAccount = await tx.account.findFirst({
+      let existingToAccount = null;
+
+      if (existingToAccountId) {
+        existingToAccount = await tx.account.findFirst({
           where: {
-            id: newAccountId,
+            id: existingToAccountId,
+            userId,
+          },
+        });
+      }
+
+      // =======================================================
+      // NEW SOURCE ACCOUNT
+      //
+      // This MUST exist.
+      // =======================================================
+
+      const newAccount = await tx.account.findFirst({
+        where: {
+          id: newAccountId,
+          userId,
+        },
+      });
+
+      if (!newAccount) {
+        throw new Error("Account not found");
+      }
+
+      // =======================================================
+      // NEW DESTINATION ACCOUNT
+      //
+      // Required only for Transfer.
+      // =======================================================
+
+      let newToAccount = null;
+
+      if (newType === TransactionType.Transfer) {
+        newToAccount = await tx.account.findFirst({
+          where: {
+            id: newToAccountId!,
             userId,
           },
         });
 
-        if (!newAccount) {
-          throw new Error("Account not found");
+        if (!newToAccount) {
+          throw new Error("Transfer to account is not found");
         }
       }
-      // Link orphaned transaction
-      if (!existingAccountId && newAccount) {
-        const updatedBalance = newAccount.balance + newEffect;
 
-        if (newType === TransactionType.Expense && updatedBalance < 0) {
-          throw new Error(
-            `Insufficient balance. Available balance is ${newAccount.balance}`,
-          );
-        }
+      // =======================================================
+      // 1. REVERSE OLD TRANSACTION
+      // =======================================================
 
-        await tx.account.update({
-          where: {
-            id: newAccount.id,
-          },
-          data: {
-            balance: updatedBalance,
-          },
-        });
-      }
-      // Same account
-      else if (
-        existingAccount &&
-        newAccount &&
-        existingAccountId === newAccountId
+      // OLD INCOME
+      if (
+        transactionDetails.type === TransactionType.Income &&
+        existingAccount
       ) {
-        if (type !== undefined || amount !== undefined) {
-          const updatedBalance =
-            existingAccount.balance - oldEffect + newEffect;
-
-          if (newType === TransactionType.Expense && updatedBalance < 0) {
-            throw new Error(
-              `Insufficient balance. Available balance is ${
-                existingAccount.balance - oldEffect
-              }`,
-            );
-          }
-
-          await tx.account.update({
-            where: {
-              id: existingAccount.id,
-            },
-            data: {
-              balance: updatedBalance,
-            },
-          });
-        }
-      } else if (
-        existingAccount &&
-        newAccount &&
-        existingAccountId !== newAccountId
-      ) {
-        const restoredOldBalance = existingAccount.balance - oldEffect;
-
         await tx.account.update({
           where: {
             id: existingAccount.id,
           },
           data: {
-            balance: restoredOldBalance,
+            balance: {
+              decrement: transactionDetails.amount,
+            },
           },
         });
+      }
 
-        const updatedNewBalance = newAccount.balance + newEffect;
+      // OLD EXPENSE
+      if (
+        transactionDetails.type === TransactionType.Expense &&
+        existingAccount
+      ) {
+        await tx.account.update({
+          where: {
+            id: existingAccount.id,
+          },
+          data: {
+            balance: {
+              increment: transactionDetails.amount,
+            },
+          },
+        });
+      }
 
-        if (newType === TransactionType.Expense && updatedNewBalance < 0) {
+      if (transactionDetails.type === TransactionType.Transfer) {
+        if (existingAccount) {
+          await tx.account.update({
+            where: {
+              id: existingAccount.id,
+            },
+            data: {
+              balance: {
+                increment: transactionDetails.amount,
+              },
+            },
+          });
+        }
+
+        if (existingToAccount) {
+          await tx.account.update({
+            where: {
+              id: existingToAccount.id,
+            },
+            data: {
+              balance: {
+                decrement: transactionDetails.amount,
+              },
+            },
+          });
+        }
+      }
+
+      // =======================================================
+      // 2. GET SOURCE ACCOUNT AGAIN
+      //
+      // We reversed the old transaction above, so we need the
+      // latest balance before applying the new transaction.
+      // =======================================================
+
+      const sourceAccount = await tx.account.findFirst({
+        where: {
+          id: newAccountId,
+          userId,
+        },
+      });
+
+      if (!sourceAccount) {
+        throw new Error("Account not found");
+      }
+
+      // =======================================================
+      // 3. APPLY NEW TRANSACTION
+      // =======================================================
+
+      // NEW INCOME
+      if (newType === TransactionType.Income) {
+        await tx.account.update({
+          where: {
+            id: sourceAccount.id,
+          },
+          data: {
+            balance: {
+              increment: newAmount,
+            },
+          },
+        });
+      }
+
+      // NEW EXPENSE
+      if (newType === TransactionType.Expense) {
+        if (sourceAccount.balance < newAmount) {
           throw new Error(
-            `Insufficient balance. Available balance is ${newAccount.balance}`,
+            `Insufficient balance. Available balance is ${sourceAccount.balance}`,
           );
         }
 
         await tx.account.update({
           where: {
-            id: newAccount.id,
+            id: sourceAccount.id,
           },
           data: {
-            balance: updatedNewBalance,
+            balance: {
+              decrement: newAmount,
+            },
           },
         });
       }
 
+      // NEW TRANSFER
+      if (newType === TransactionType.Transfer) {
+        if (sourceAccount.balance < newAmount) {
+          throw new Error(
+            `Insufficient balance. Available balance is ${sourceAccount.balance}`,
+          );
+        }
+
+        await tx.account.update({
+          where: {
+            id: sourceAccount.id,
+          },
+          data: {
+            balance: {
+              decrement: newAmount,
+            },
+          },
+        });
+
+        await tx.account.update({
+          where: {
+            id: newToAccount!.id,
+          },
+          data: {
+            balance: {
+              increment: newAmount,
+            },
+          },
+        });
+      }
+
+      // 4. UPDATE TRANSACTION
       return tx.transaction.update({
         where: {
           id: transactionId,
