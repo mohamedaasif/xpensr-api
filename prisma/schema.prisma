@@ -38,18 +38,36 @@ enum PaymentType {
 
 // User model
 model User {
-  id           String        @id @default(uuid())
-  firstName    String
-  lastName     String
-  email        String        @unique
-  password     String
-  phone        String?       @unique
-  dob          DateTime?
-  countryCode  String?       @default("+91")
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  accounts     Account[]
-  transactions Transaction[]
+  id             String          @id @default(uuid())
+  firstName      String
+  lastName       String
+  email          String          @unique
+  password       String
+  phone          String?         @unique
+  dob            DateTime?
+  countryCode    String?         @default("+91")
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  accounts       Account[]
+  transactions   Transaction[]
+  passwordResets PasswordReset[]
+}
+
+// Password reset model
+model PasswordReset {
+  id                  String    @id @default(uuid())
+  userId              String
+  user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  otpHash             String
+  otpExpiresAt        String
+  otpAttempts         Int       @default(0)
+  resetTokenHash      String?
+  resetTokenExpiresAt DateTime?
+  isOtpVerified       Boolean   @default(false)
+  verifiedAt          DateTime?
+  createdAt           DateTime  @default(now())
+
+  @@index([userId])
 }
 
 // Accounts model
