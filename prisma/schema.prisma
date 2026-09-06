@@ -59,7 +59,7 @@ model PasswordReset {
   userId              String
   user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   otpHash             String
-  otpExpiresAt        String
+  otpExpiresAt        DateTime
   otpAttempts         Int       @default(0)
   resetTokenHash      String?
   resetTokenExpiresAt DateTime?
